@@ -1,0 +1,8 @@
+Installation:
+
+standard:
+
+perl Makefile.PL
+make
+make install
+

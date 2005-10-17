@@ -1,0 +1,58 @@
+[% DEFAULT APP_NAME='mySpiffyApp' -%]
+[% DEFAULT EMAIL='bradley@kitefamily.co.uk' -%]
+Summary: [% APP_NAME %] Apache Module
+Name: [% APP_NAME %]
+Version: @VERSION@
+Release: 1
+Group: WWW
+License: GPL
+BuildRoot: %{_tmppath}/%{name}-root
+BuildArch: noarch
+Source0: [% APP_NAME %]-@VERSION@.tar.gz
+
+%description
+CHANGE ME
+
+%prep
+%setup -q
+
+%build
+
+aclocal
+autoconf
+automake
+
+./configure --prefix=@prefix@
+
+make
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make DESTDIR=$RPM_BUILD_ROOT install
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files
+%defattr(0644,root,root)
+[% FOREACH tableName = TABLES -%]
+@prefix@/modules/DB/Row/[% tableName %].pm
+@prefix@/modules/DB/Table/[% tableName %].pm
+@prefix@/modules/Apache/Request/Controller/[% tableName %].pm
+@prefix@/[% APP_NAME %]/templates/[% tableName %]/list.tt2
+@prefix@/[% APP_NAME %]/templates/[% tableName %]/show.tt2
+@prefix@/[% APP_NAME %]/templates/[% tableName %]/create.tt2
+@prefix@/[% APP_NAME %]/templates/[% tableName %]/edit.tt2
+[% END -%]
+@prefix@/[% APP_NAME %]/templates/_header.tt2
+@prefix@/[% APP_NAME %]/templates/_fieldDisplay.tt2
+@prefix@/[% APP_NAME %]/templates/_fieldInput.tt2
+@prefix@/[% APP_NAME %]/templates/_fkeyDisplay.tt2
+@prefix@/[% APP_NAME %]/templates/_fkeyInput.tt2
+@prefix@/[% APP_NAME %]/templates/_pager.tt2
+@prefix@/[% APP_NAME %]/templates/_form.tt2
+@prefix@/[% APP_NAME %]/html/js/prototype.js
+@prefix@/[% APP_NAME %]/html/js/validate.js
+%config /etc/httpd/conf.d/[% APP_NAME %].apache.conf
+%config /etc/httpd/conf.d/[% APP_NAME %].pl
+%config @prefix@/[% APP_NAME %]/[% APP_NAME %].cfg

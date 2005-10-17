@@ -1,0 +1,37 @@
+[% DEFAULT APP_NAME='mySpiffyApp' -%]
+[% DEFAULT EMAIL='bradley@kitefamily.co.uk' -%]
+AC_INIT([[% APP_NAME %]], [0.0.1], [[% EMAIL %]])
+
+AM_INIT_AUTOMAKE
+
+AC_PREFIX_DEFAULT([/data])
+
+app_name="[% APP_NAME %]"
+
+AC_SUBST([VERSION])
+AC_SUBST([prefix])
+AC_SUBST([app_name])
+
+AC_CONFIG_FILES([Makefile \
+                 DB/Makefile \
+                 DB/Table/Makefile \
+                 DB/Table/Row/Makefile \
+                 Apache/Makefile \
+                 Apache/Request/Makefile \
+                 Apache/Request/Controller/Makefile \
+                 html/Makefile \
+                 html/js/Makefile \
+                 templates/Makefile \
+[% FOREACH tableName = TABLES -%]
+                 DB/Table/[% tableName %]/Makefile \
+                 DB/Table/Row/[% tableName %]/Makefile \
+                 Apache/Request/Controller/[% tableName %]/Makefile \
+                 templates/[% tableName %]/Makefile \
+[% END -%]
+                 [% APP_NAME %].cfg \
+                 [% APP_NAME %].spec \
+                 [% APP_NAME %].apache.conf \
+                 [% APP_NAME %].pl ])
+
+AC_OUTPUT
+

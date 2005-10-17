@@ -1,0 +1,39 @@
+
+[% IF BOOK.numPages() > 1 || BOOK.pageSize() == 0 %]
+<table width="60%">
+  <tr>
+    <td>
+      [% IF BOOK.currentPage() > 1 %]
+        <a href="[% REQUEST.uri() %]?[% IF PATTERN %]pattern=[% PATTERN %]&[% END %]pageStart=[% BOOK.previousPage() %]&pageSize=[% BOOK.pageSize() %]">Previous Page</a>
+      [% ELSE %]
+        Previous Page
+      [% END %]
+    </td>
+    <td>
+      Displaying Item [% BOOK.firstObject() %] - [% BOOK.lastObject() %] of [% BOOK.numObjects() %]
+    </td>
+    <td>
+      [% IF BOOK.currentPage() < BOOK.numPages() %]
+        <a href="[% REQUEST.uri() %]?[% IF PATTERN %]pattern=[% PATTERN %]&[% END %]pageStart=[% BOOK.nextPage() %]&pageSize=[% BOOK.pageSize() %]">Next Page</a>
+      [% ELSE %]
+        Next Page
+      [% END %]
+    </td>
+    <td align="right">
+      <form action="[% REQUEST.uri() %]" method="get">
+      [%- IF PATTERN -%]
+      <input type="hidden" name="pattern" value="[% PATTERN %]">
+      [%- END -%]
+      <input type="hidden" name="pageStart" value="[% BOOK.pageStart() %]">
+      <select name="pageSize" onChange="this.form.submit()">
+        <option[% IF BOOK.pageSize() == 10 %] selected[% END %] value="10">10/page</option>
+        <option[% IF BOOK.pageSize() == 25 %] selected[% END %] value="25">25/page</option>
+        <option[% IF BOOK.pageSize() == 50 %] selected[% END %] value="50">50/page</option>
+        <option[% IF BOOK.pageSize() == 100 %] selected[% END %] value="100">100/page</option>
+        <option[% IF BOOK.pageSize() == 0 %] selected[% END %] value="0">All on 1 page</option>
+      </select> Results/Page
+      </form>
+    </td>
+  </tr>
+</table>
+[% END %]

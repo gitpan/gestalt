@@ -1,0 +1,19 @@
+<!-- partial, used to display different field types in different ways. -->
+    [% IF field.type == 'character varying' %]
+      [% ROW.$fieldName() %]
+    [% ELSIF field.type == 'inet' %]
+      [% ROW.$fieldName() %]
+    [% ELSIF field.type == 'text' %]
+      <p>[% ROW.$fieldName() %]</p>
+    [% ELSIF field.type == 'bigint' %]
+      [% ROW.$fieldName() %]
+    [% ELSIF field.type == 'integer' %]
+      [% ROW.$fieldName() %]
+    [% ELSIF field.type == 'smallint' %]   
+      [% ROW.$fieldName() %]
+    [% ELSIF field.type == 'date' %]
+      [% ROW.$fieldName() %]
+    [% ELSE %]
+       (Unknown Type: [% field.type %]) [% ROW.$fieldName() %]
+    [% END %]
+
