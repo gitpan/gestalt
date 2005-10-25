@@ -1,4 +1,6 @@
 MANIFEST
+LICENSE
+TODO
 DB/Makefile.PL
 DB/Table/Makefile.PL
 DB/Table/Row/Makefile.PL
@@ -23,6 +25,7 @@ templates/templates/show.tt2
 templates/templates/edit.tt2
 templates/templates/_fkeyInput.tt2
 templates/templates/_header.tt2
+templates/templates/_auth.tt2
 templates/Makefile.PL
 templates/README
 templates/Table.pm
@@ -31,14 +34,14 @@ templates/html/Makefile.am
 templates/html/js/Makefile.am
 templates/html/js/validate.js
 templates/html/js/prototype.js
+templates/html/css/Makefile.am
+templates/html/css/style.css
 templates/Row.pm
 templates/ChangeLog
 templates/AUTHORS
 templates/bootstrap
 templates/apache.conf.in
 templates/Controller.pm
-Paginator/Makefile.PL
-Paginator/Paginator.pm
 META.yml
 Makefile.PL
 INSTALL

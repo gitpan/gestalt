@@ -22,8 +22,10 @@
         </td>
       </tr>
     [% END %]
+    [% IF BUTTON_NAME %]
     <tr>
       <td colspan="2"><input type="submit" name="action" value="[% BUTTON_NAME %]"></td>
     </tr>
+    [% END %]
     </table>
 

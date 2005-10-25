@@ -110,30 +110,39 @@ sub _init
     my $dbh       = shift;
     my $tableName = shift;
 
+    # I've discovered that 'location' is a postgresql non-reserved key-word, and as such
+    # $dbh->table_into() returns the TABLE_NAME in double-quotes. We protect from this by
+    # removing the quotes.
+    $tableName =~ s/(^\"|\"$)//g;
+
     my $tableSth = $dbh->table_info(undef, undef, $tableName, "TABLE");
     my $t = $tableSth->fetchrow_hashref || confess("Could not retrieve information about $tableName. Are you sure it exists?");
 
     my @tableDesc = split(/,/, $t->{'REMARKS'});
-    my $table = { tableName  => $t->{'TABLE_NAME'},
+    my $table = { tableName  => $tableName,
                   tableDesc  => \@tableDesc,
                   fields     => [],
                   pkeyFields => [],
                   fkeyFields => [],
                   field      => {}};
 
-    my $pkeySth = $dbh->primary_key_info(undef, undef, $t->{'TABLE_NAME'});
+    my $pkeySth = $dbh->primary_key_info(undef, undef, $tableName);
     while (my $p = $pkeySth->fetchrow_hashref)
     {
+        $p->{'COLUMN_NAME'} =~ s/(^\"|\"$)//g; # See comment against $tableName
         push @{$table->{'pkeyFields'}}, $p->{'COLUMN_NAME'};
         $table->{'field'}->{$p->{'COLUMN_NAME'}}->{'pkey'} = 1;
     }
 
     my $fkeySth = $dbh->foreign_key_info(undef, undef, undef,
-                                         undef, undef, $t->{'TABLE_NAME'});
+                                         undef, undef, $tableName);
     if (defined ($fkeySth))
     {
         while (my $f = $fkeySth->fetchrow_hashref)
         {
+            $f->{'FK_COLUMN_NAME'} =~ s/(^\"|\"$)//g; # See comment against $tableName
+            $f->{'UK_COLUMN_NAME'} =~ s/(^\"|\"$)//g; # See comment against $tableName
+            $f->{'UK_TABLE_NAME'}  =~ s/(^\"|\"$)//g; # See comment against $tableName
             next unless (defined ($f->{'FK_NAME'}));
             push @{$table->{'fkeyFields'}}, $f->{'FK_COLUMN_NAME'};
             $table->{'field'}->{$f->{'FK_COLUMN_NAME'}}->{'fkey'} = {table  => $f->{'UK_TABLE_NAME'},
@@ -141,14 +150,17 @@ sub _init
         }
     }
 
-    my $refKeySth = $dbh->foreign_key_info(undef, undef, $t->{'TABLE_NAME'},
+    my $refKeySth = $dbh->foreign_key_info(undef, undef, $tableName,
                                            undef, undef, undef);
-    my $refKeySth = $dbh->foreign_key_info(undef, undef, $t->{'TABLE_NAME'},
+    my $refKeySth = $dbh->foreign_key_info(undef, undef, $tableName,
                                            undef, undef, undef);
     if (defined ($refKeySth))
     {
         while (my $ref = $refKeySth->fetchrow_hashref)
         {
+            $ref->{'FK_TABLE_NAME'}  =~ s/(^\"|\"$)//g; # See comment against $tableName
+            $ref->{'FK_COLUMN_NAME'} =~ s/(^\"|\"$)//g; # See comment against $tableName
+            $ref->{'UK_COLUMN_NAME'} =~ s/(^\"|\"$)//g; # See comment against $tableName
             next unless (defined ($ref->{'FK_NAME'}));
             push @{$table->{'rkeys'}}, {table  => $ref->{'FK_TABLE_NAME'},
                                         field  => $ref->{'FK_COLUMN_NAME'},
@@ -156,19 +168,27 @@ sub _init
         }
     }
 
-    my $columnSth = $dbh->column_info(undef, undef, $t->{'TABLE_NAME'}, undef);
+    my $columnSth = $dbh->column_info(undef, undef, $tableName, undef);
     while (my $c = $columnSth->fetchrow_hashref)
     {
-        $c->{'COLUMN_NAME'} =~ s/(^\"|\"$)//g; # Sometimes fields have quotes?!?
+        $c->{'COLUMN_NAME'} =~ s/(^\"|\"$)//g; # See comment against $tableName
         push @{$table->{'fields'}}, $c->{'COLUMN_NAME'} unless ($table->{'field'}->{$c->{'COLUMN_NAME'}}->{'pkey'});
+
+        my $is_array = 0;
+        if ($c->{'TYPE_NAME'} =~ s/\[\]$//g)
+        {
+            $is_array = 1;
+        }
 
         $table->{'field'}->{$c->{'COLUMN_NAME'}}->{'name'}     = $c->{'COLUMN_NAME'};
         $table->{'field'}->{$c->{'COLUMN_NAME'}}->{'desc'}     = $c->{'REMARKS'};
         $table->{'field'}->{$c->{'COLUMN_NAME'}}->{'type'}     = $c->{'TYPE_NAME'};
+        $table->{'field'}->{$c->{'COLUMN_NAME'}}->{'type_num'} = $c->{'DATA_TYPE'};
         $table->{'field'}->{$c->{'COLUMN_NAME'}}->{'length'}   = $c->{'COLUMN_SIZE'};
         $table->{'field'}->{$c->{'COLUMN_NAME'}}->{'read'}     = 1;
         $table->{'field'}->{$c->{'COLUMN_NAME'}}->{'write'}    = 1 unless ($table->{'field'}->{$c->{'COLUMN_NAME'}}->{'pkey'});
         $table->{'field'}->{$c->{'COLUMN_NAME'}}->{'nullable'} = $c->{'NULLABLE'};
+        $table->{'field'}->{$c->{'COLUMN_NAME'}}->{'is_array'} = $is_array;
         # There is no equivalent in MySQL, but if the user wishes to customise
         # this manually they may. The evaluation/checking of the constraint should
         # still work.
@@ -301,6 +321,8 @@ properties the individual field specified by $fieldName
   The elements of this hash are as follows (* means required):
   name*      => scalar(string) : The name of the field/column
   type*      => scalar(string) : The SQL data type of the field/column
+  type_num   => scalar(int)    : The numeric data type
+  is_array   => scalar(bool)   : If the column can hold arrays (Postgres Only).
   length*    => scalar(int)    : The size of the field in bytes
   nullable   => scalar(boolean): If this field/column can store NULL values
   desc       => scalar(string) : The human description of this field/column
@@ -540,8 +562,6 @@ then that module is used instead of the vanilla DB::Table module. This
 allows the table to interact with subclasses of DB::Table, so that you
 can customise it on a per-table basis.
 
-=back
-
 =cut
 sub referingTables
 {
@@ -567,6 +587,31 @@ sub referingTables
     return @tables;
 }
 # /* referingTables */ }}}
+
+# /* getRowsWhere */ {{{
+=pod
+
+=item my @rows = $table->getRowsWhere($whereClause, $bindParams, $options);
+
+This method allows you to fetch rows from the specified table using
+a custom where clause.
+
+=back
+
+=cut
+
+sub getRowsWhere
+{
+    my $self = shift;
+
+    my $className = sprintf("DB::Table::Row::%s", $self->componentName);
+    if ($className->can('getRowsWhere'))
+    {
+        return $className->getRowsWhere($self->{'dbh'}, $self, @_);
+    }
+    return DB::Table::Row->getRowsWhere($self->{'dbh'}, $self, @_);
+}
+# /* getRowsWhere */ }}}
 
 =pod
 

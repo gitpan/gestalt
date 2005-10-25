@@ -1,6 +1,6 @@
 [% UNLESS NO_HEADER %]<head>[% END %]
   <title>[% title %]</title>
-  <script src="/[% APP_NAME %]/js/prototype.js" language="javaScript"></script>
-  <script src="/[% APP_NAME %]/js/validate.js" language="javaScript"></script>
-  <link href="http://www.synetrix.co.uk/synetrix_style.css" rel="stylesheet" type="text/css">
+  <script src="[% REQUEST.location() %]/js/prototype.js" language="javaScript"></script>
+  <script src="[% REQUEST.location() %]/js/validate.js" language="javaScript"></script>
+  <link href="[% REQUEST.location() %]/css/style.css" rel="stylesheet" type="text/css">
 [% UNLESS NO_HEADER %]<head>[% END %]

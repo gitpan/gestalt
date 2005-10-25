@@ -8,9 +8,37 @@ AC_PREFIX_DEFAULT([/data])
 
 app_name="[% APP_NAME %]"
 
+AC_ARG_WITH([apache-conf],
+            AS_HELP_STRING([--with-apache-conf],
+                           [Specify Apache's config dir]),
+            [apacheIncludedConfigs=$withval], [])
+
+if [[ "x${apacheIncludedConfigs}" == "x" ]]
+then
+    AC_PATH_PROG([APXS], [apxs], [''], [$PATH:/sbin:/usr/sbin:/usr/local/apache2/bin:/usr/apache2/bin])
+
+    if [[ "x${APXS}" == "x" ]]
+    then
+        echo "Could not find apxs in \$PATH"
+        echo "Try using --with-apache-conf to manually specify the Apache config DIR"
+        exit 1
+    fi
+
+    apacheIncludedConfigs=$(grep '^Include' $(${APXS} -q SYSCONFDIR)/httpd.conf | cut -f 2 -d ' ' | sed -e 's/\/\*\.conf//g')
+
+    if ! echo ${apacheIncludedConfigs} | grep '^\/'
+    then
+        # Its relative, find what its relative to
+        rootDir=$(grep '^ServerRoot' $(${APXS} -q SYSCONFDIR)/httpd.conf | cut -f 2 -d ' ' | sed -e 's/\"//g')
+        apacheIncludedConfigs=${rootDir}/${apacheIncludedConfigs}
+    fi
+fi
+
+
 AC_SUBST([VERSION])
 AC_SUBST([prefix])
 AC_SUBST([app_name])
+AC_SUBST([apacheIncludedConfigs])
 
 AC_CONFIG_FILES([Makefile \
                  DB/Makefile \
@@ -21,6 +49,7 @@ AC_CONFIG_FILES([Makefile \
                  Apache/Request/Controller/Makefile \
                  html/Makefile \
                  html/js/Makefile \
+                 html/css/Makefile \
                  templates/Makefile \
 [% FOREACH tableName = TABLES -%]
                  DB/Table/[% tableName %]/Makefile \

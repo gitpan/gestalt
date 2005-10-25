@@ -7,10 +7,19 @@
 
   <h1>Listing [% TABLE.desc().1 %]</h1>
 
-  [% FOREACH fKey = TABLE.foreignKeys() %]
-    [% fTable = TABLE.fkeyTable( fKey ) %]
-    <a href="../[% fTable.componentName() %]">[% fTable.desc().1 %]</a>[% UNLESS loop.last %] | [% END %]
-  [% END %]
+  <table width="80%">
+    <tr>
+      <td align="left">
+        [% FOREACH fKey = TABLE.foreignKeys() %]
+          [% fTable = TABLE.fkeyTable( fKey ) %]
+          <a href="../[% fTable.componentName() %]">[% fTable.desc().1 %]</a>[% UNLESS loop.last %] | [% END %]
+        [% END %]
+      </td>
+      <td align="right">
+        [% INCLUDE _auth.tt2 %]
+      </td>
+    </tr>
+  </table>
   <br><br>
   <a href="create">Create</a><br>
   <br>
@@ -18,6 +27,7 @@
     <b>Search:</b> <input type="text" name="pattern" value="[% PATTERN %]"> <input type="submit" value="Search">
   </form>
 
+  [% USE page = Page( BOOK.rows, BOOK.pageSize, BOOK.pageNum ) %]
   [% INCLUDE _pager.tt2 %]
 
   <table>
@@ -30,7 +40,7 @@
       <td><b>View</b></td>
       <td><b>Delete</b></td>
     </tr>
-    [% FOREACH ROW = BOOK.getObjects() %]
+    [% FOREACH ROW = page.splice(ROWS) %]
     <tr>
       [% FOREACH fName = TABLE.summaryFields() %]
         [% f = TABLE.field( fName ) %]

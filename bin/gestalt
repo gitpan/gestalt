@@ -2,9 +2,6 @@
 
 # TODO: (in priority order)
 
-# Allow the user to (optionally) specify which components to generate:
-# model, control, view, and build - where 'build' creates the Makefile's etc.
-
 # Also, see if a top-level Makefile.PL can be built so that the user can have
 # the option of using 'perl Makefile.PL' or ./configure
 
@@ -100,7 +97,7 @@ EOF
     exit 1;
 }
 
-my $dbh = DBI->connect("dbi:Pg:dbname=$database;host=$host", $username, $password);
+my $dbh = DBI->connect("dbi:Pg:dbname=$database;host=$host", $username, $password) || die "Could not connect to database: " . $DBI::errstr;
 
 my $tableSth = $dbh->table_info(undef, undef, undef, "TABLE");
 

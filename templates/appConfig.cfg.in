@@ -9,4 +9,7 @@ templatePath="@prefix@/[% APP_NAME %]/templates"
 
 defaultController=[% TABLES.0 %]
 
-useSessions="Apache::Session::Postgres"
+# If you wish to use sessions, uncomment this and make sure you have
+# created the sessions table within the database db_dsn.
+#useSessions="Apache::Session::Postgres"
+#sessionTable="sessions"

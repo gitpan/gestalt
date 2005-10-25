@@ -51,8 +51,10 @@ rm -rf $RPM_BUILD_ROOT
 @prefix@/[% APP_NAME %]/templates/_fkeyInput.tt2
 @prefix@/[% APP_NAME %]/templates/_pager.tt2
 @prefix@/[% APP_NAME %]/templates/_form.tt2
+@prefix@/[% APP_NAME %]/templates/_auth.tt2
 @prefix@/[% APP_NAME %]/html/js/prototype.js
 @prefix@/[% APP_NAME %]/html/js/validate.js
-%config /etc/httpd/conf.d/[% APP_NAME %].apache.conf
-%config /etc/httpd/conf.d/[% APP_NAME %].pl
+@prefix@/[% APP_NAME %]/html/css/style.css
+%config @apacheIncludedConfigs@/[% APP_NAME %].apache.conf
+%config @apacheIncludedConfigs@/[% APP_NAME %].pl
 %config @prefix@/[% APP_NAME %]/[% APP_NAME %].cfg

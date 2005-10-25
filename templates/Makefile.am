@@ -28,7 +28,8 @@ template_DATA = _header.tt2 \
                 _fkeyDisplay.tt2 \
                 _fkeyInput.tt2 \
                 _pager.tt2 \
-                _form.tt2
+                _form.tt2 \
+                _auth.tt2
 EXTRA_DIST = $(template_DATA)
 [% END -%]
 [% END -%]
@@ -53,8 +54,7 @@ EXTRA_DIST = $(template_DATA)
 cfgdir=$(prefix)/[% APP_NAME %]
 cfg_DATA = [% APP_NAME %].cfg
 
-
-apacheconfdir=/etc/httpd/conf.d
+apacheconfdir=$(apacheIncludedConfigs)
 apacheconf_DATA = [% APP_NAME %].apache.conf \
                   [% APP_NAME %].pl
 

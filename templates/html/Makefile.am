@@ -1,3 +1,3 @@
 
-SUBDIRS = js
+SUBDIRS = js css
 

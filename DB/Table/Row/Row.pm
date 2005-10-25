@@ -66,19 +66,18 @@ sub construct
     my $table = shift || confess("Usage: $class->new(\$dbh, \$table, \$obj)");
     my $obj   = shift || {};
 
-    $obj->{'_dbh'}   = $dbh;
-    $obj->{'_table'} = $table;
+    my $self = {};
 
-    # WARNING: This assumes that the first primary key field is the one with the serial column.
-    # In most cases it is, but this wont work if it isnt.
-    $obj->{($table->primaryKeys())[0]} = undef;
+    $self->{'_dbh'}   = $dbh;
+    $self->{'_table'} = $table;
 
-    delete($obj->{'_deleted'});
-    delete($obj->{'_modified'});
-    delete($obj->{'_validationError'});
-    delete($obj->{'_validation'});
+    $self->{'_notInserted'} = 1;
 
-    return bless ($obj, $class);
+    bless ($self, $class);
+
+    map { $self->setValue($_, $obj->{$_}) } $table->fields();
+
+    return $self;
 }
 # /* construct */ }}}
 
@@ -121,11 +120,10 @@ sub getByPKey
     my $table = shift || confess("Usage: $class->getByPKey(\$dbh, \$table [, \@IDs ]);");
 
     my @obj_ids = @_;
-    my $pageOptions = {pageLength => 'ALL',
-                       pageOffset => 0};
+    my $options;
     if (ref($obj_ids[0]) eq 'HASH')
     {
-        $pageOptions = shift @obj_ids;
+        $options = shift @obj_ids;
     }
 
     my @rows; # Store fetched rows...
@@ -134,14 +132,78 @@ sub getByPKey
     my $numExpectedObjs = scalar(@obj_ids);
     if ($numExpectedObjs > 0)
     {
+        my $where = join(' AND ', map { "$_ = ?" } $table->primaryKeys());
+        foreach my $id (@obj_ids)
+        {
+            my @params = ref($id) eq 'ARRAY' ? @{$id} : $id;
+            push @rows, $class->getRowsWhere($dbh, $table, $where, \@params, $options);
+        }
+    }
+    else
+    {
+        push @rows, $class->getRowsWhere($dbh, $table, undef, undef, $options);
+    }
+
+    return wantarray ? @rows : $rows[0];
+}
+# /* getByPKey */ }}}
+
+# /* getRowsWhere */ {{{
+=pod
+
+=item my @rows = DB::Table::Row->getRowsWhere($dbh, $table, $whereClause, $bindParams, $options);
+
+This method allows for you to retrieve rows from the database table using a custom where clause,
+defined by the string $whereClause. Any place-holders to be interpolated should contain
+question marks, as with the DBI, and the actual values should be passed in an array-reference
+specifined by $bindParams. $options is an optional hash-reference which can define other
+selection options, such as how to order the results and limit the results returned.
+It has 3 elements: pageLength and pageOffset, and orderBy. pageLength specifies
+how many rows to return, while pageOffset specifies where to start counting from.
+orderBy can be a string such as 'username, password' which will then order the results
+first by the username column, then by the password column. By default, rows are ordered
+by primary key.
+
+  Example:
+
+    my $username = 'bradley';
+    my $password = 'as if';
+    my @rows = DB::Table::Row->getRowsWhere($dbh, $table,
+                  "username = ? AND password = ?",
+                  [$username, $password],
+                  {pageLength => 1, pageOffset 0});
+
+The above will select the first row from the table specified by the DB::Table object $table,
+with the given username and password.
+
+=cut
+
+sub getRowsWhere
+{
+    my $ref = shift;
+    my $class = ref($ref) || $ref;
+
+    my $dbh         = shift;
+    my $table       = shift;
+    my $where       = shift || '';
+    my $bindParams  = shift || [];
+
+    my $options = shift || {};
+    $options->{'pageLength'} ||= 'ALL';
+    $options->{'pageOffset'} ||= 0;
+    $options->{'orderBy'}    ||= join(', ', $table->primaryKeys());
+
+    my $get_obj_sql;
+    if ($where ne '')
+    {
         $get_obj_sql = sprintf("SELECT %s, %s FROM %s WHERE %s ORDER BY %s LIMIT %s OFFSET %s",
-                              join(', ', $table->primaryKeys),
+                              join(', ', $table->primaryKeys()),
                               join(', ', $table->fields()),
                               $table->name(),
-                              join(' AND ', map { "$_ = ?" } $table->primaryKeys()),
-                              join(', ', $table->primaryKeys()),
-                              $pageOptions->{'pageLength'},
-                              $pageOptions->{'pageOffset'});
+                              $where,
+                              $options->{'orderBy'},
+                              $options->{'pageLength'},
+                              $options->{'pageOffset'});
     }
     else
     {
@@ -149,51 +211,38 @@ sub getByPKey
                               join(', ', $table->primaryKeys()),
                               join(', ', $table->fields()),
                               $table->name(),
-                              join(', ', $table->primaryKeys()),
-                              $pageOptions->{'pageLength'},
-                              $pageOptions->{'pageOffset'});
+                              $options->{'orderBy'},
+                              $options->{'pageLength'},
+                              $options->{'pageOffset'});
     }
     my $get_obj_sth = $dbh->prepare_cached($get_obj_sql, {pg_prepare_now => 1}, 3) or
       confess (sprintf("Could not prepare_cached(%s): Error Code %d (%s)", $get_obj_sql, $dbh->err, $dbh->errstr));
 
-    do
-    {
-        my $id = shift @obj_ids;
-        my $success;
-        if (defined ($id))
-        {
-            $success = $get_obj_sth->execute(ref($id) eq 'ARRAY' ? @{$id} : $id);
-        }
-        else
-        {
-            $success = $get_obj_sth->execute();
-        }
+    $get_obj_sth->execute(@{$bindParams}) or
+      do {
+        # TODO: Raise an exception.
+        cluck(sprintf("Could not execute (%s)\n(%s)\nError Code %d (%s)",
+                      $get_obj_sql,
+                      join(',', @{$bindParams}),
+                      $dbh->err,
+                      $dbh->errstr));
+        die "Aborted";
+      };
 
-        unless ($success)
-        {
-            # TODO: Raise an exception.
-            cluck (sprintf("Could not execute(%s)\n(%s)\n Error Code %d (%s)",
-                          $get_obj_sql,
-                          (ref($id) eq 'ARRAY' ? @{$id} : $id),
-                          $dbh->err,
-                          $dbh->errstr));
-            return undef;
-        }
-        my %row = (_dbh   => $dbh,
-                   _table => $table);
-        $get_obj_sth->bind_columns(map { \$row{$_} } $table->primaryKeys, $table->fields());
-        while ($get_obj_sth->fetch)
-        {
-            my (%newRow) = (%row);
-            push @rows, bless (\%newRow, $class);
-        }
-        $get_obj_sth->finish;
+    my %row = (_dbh   => $dbh,
+               _table => $table);
+    $get_obj_sth->bind_columns(map { \$row{$_} } $table->primaryKeys(), $table->fields());
+    my @rows;
+    while ($get_obj_sth->fetch)
+    {
+        my (%newRow) = (%row);
+        push @rows, bless (\%newRow, $class);
     }
-    while (@obj_ids);
+    $get_obj_sth->finish;
 
     return wantarray ? @rows : $rows[0];
 }
-# /* getByPKey */ }}}
+# /* getRowsWhere */ }}}
 
 # /* getByFKey */ {{{
 =pod
@@ -206,7 +255,7 @@ rows where a non-primary-key field is equal to a value supplied in the list
 of @FKeys. For example, if you want to get all rows who's 'owner_id' field
 is equal to 5, you might say:
 
-  my $row = DB::Table::Row->getByFKey($dbh, $table, 'owner_id', 5);
+  my @row = DB::Table::Row->getByFKey($dbh, $table, 'owner_id', 5);
 
 =cut
 sub getByFKey
@@ -225,50 +274,16 @@ sub getByFKey
     my $numExpectedObjs = scalar(@fKeyIds);
     if ($numExpectedObjs > 0)
     {
-        $get_obj_sql = sprintf("SELECT %s, %s FROM %s WHERE %s ORDER BY %s",
-                              join(', ', $table->primaryKeys()),
-                              join(', ', $table->fields()),
-                              $table->name(),
-                              "$fKeyName = ?",
-                              join(', ', $table->primaryKeys()));
+        my $where = "$fKeyName = ?";
+        foreach my $fkey (@fKeyIds)
+        {
+            push @rows, $class->getRowsWhere($dbh, $table, $where, [$fkey]);
+        }
     }
     else
     {
         confess("Usage: $class->getByFKey(\$dbh, \$table, \$fKeyName, \@FKeys]);");
     }
-    my $get_obj_sth = $dbh->prepare_cached($get_obj_sql, {pg_prepare_now => 1}, 3) or
-      confess (sprintf("Could not prepare_cached(%s): Error Code %d (%s)", $get_obj_sql, $dbh->err, $dbh->errstr));
-
-    do
-    {
-        my $id = shift @fKeyIds;
-        my $success;
-        if (defined ($id))
-        {
-            $success = $get_obj_sth->execute($id);
-        }
-
-        unless ($success)
-        {
-            # TODO: Raise an exception.
-            cluck (sprintf("Could not execute(%s)\n(%s)\n Error Code %d (%s)",
-                          $get_obj_sql,
-                          (ref($id) eq 'ARRAY' ? @{$id} : $id),
-                          $dbh->err,
-                          $dbh->errstr));
-            return undef;
-        }
-        my %row = (_dbh   => $dbh,
-                   _table => $table);
-        $get_obj_sth->bind_columns(map { \$row{$_} } $table->primaryKeys(), $table->fields());
-        while ($get_obj_sth->fetch)
-        {
-            my (%newRow) = (%row);
-            push @rows, bless (\%newRow, $class);
-        }
-        $get_obj_sth->finish;
-    }
-    while (@fKeyIds);
 
     return wantarray ? @rows : $rows[0];
 }
@@ -277,11 +292,14 @@ sub getByFKey
 # /* searchByString */ {{{ 
 =pod
 
-=item my @rows = DB::Table::Row->searchByString($dbh, $table, $searchString);
+=item my @rows = DB::Table::Row->searchByString($dbh, $table, $searchString, $options);
 
 This method allows a free-text search to be performed on the database. All
 non-primary-key fields are cast to a string and then search using the LIKE clause.
 Searching is not case-sensitive either.
+
+$options may specify aditionaly options for limiting the result or ordering. See the
+L<getRowsWhere()> method for more details.
 
 TODO: There is not yet a way to limit which fields are searched, and foreign key's are
 not "de-referenced".
@@ -297,39 +315,12 @@ sub searchByString
     my $dbh    = shift || confess("Usage: $class->searchByString(\$dbh, \$table, \$string);");
     my $table  = shift || confess("Usage: $class->searchByString(\$dbh, \$table, \$string);");
     my $string = shift || confess("Usage: $class->searchByString(\$dbh, \$table, \$string);");
+    my $options = shift;
 
-    my $search_obj_sql = sprintf("SELECT %s, %s FROM %s WHERE %s ORDER BY %s",
-                              join(', ', $table->primaryKeys()),
-                              join(', ', $table->fields()),
-                              $table->name(),
-                              join(' OR ', map { "LOWER($_\::text) LIKE ?" } $table->fields()),
-                              join(', ', $table->primaryKeys()));
-    my $search_obj_sth = $dbh->prepare_cached($search_obj_sql, {pg_prepare_now => 1}, 3) or
-      confess (sprintf("Could not prepare_cached(%s): Error Code %d (%s)", $search_obj_sql, $dbh->err, $dbh->errstr));
+    my $where = join(' OR ', map { "LOWER($_\::text) LIKE ?" } $table->fields());
+    my @params = map { lc("\%$string\%") } $table->fields();
 
-    my $sucess = $search_obj_sth->execute(map { lc("\%$string\%") } $table->fields());
-    unless ($sucess)
-    {
-        # TODO: Raise an exception.
-        cluck (sprintf("Could not execute(%s)\n(%s)\n Error Code %d (%s)",
-                      $search_obj_sql,
-                      (map { lc("\%$string\%") } $table->fields()),
-                      $dbh->err,
-                      $dbh->errstr));
-        return undef;
-    }
-
-    my %row = ( _dbh   => $dbh,
-                _table => $table);
-    $search_obj_sth->bind_columns(map { \$row{$_} } $table->primaryKeys(), $table->fields());
-
-    my @rows;
-    while ($search_obj_sth->fetch)
-    {
-        my (%newRow) = (%row);
-        push @rows, bless (\%newRow, $class);
-    }
-    $search_obj_sth->finish;
+    my @rows = $class->getRowsWhere($dbh, $table, $where, \@params, $options);
 
     return wantarray ? @rows : $rows[0];
 }
@@ -343,7 +334,7 @@ sub _valueMap
     my $fName = shift;
     my $value = shift;
 
-    if (!$value)
+    if ($value eq '' or (!defined ($value)))
     {
         return undef;
     }
@@ -389,9 +380,12 @@ sub insert
     {
         $self->{'_dbh'}->pg_savepoint("pre_insert"); # Create a save-point in the transaction
     }
+    eval {
     $new_obj_sth->execute(@values) or
     do {
-        if ($self->_catchDupeKeyError())
+        my $errstr = $self->{'_dbh'}->errstr;
+        my $errCode = $self->{'_dbh'}->err;
+        if ($self->_catchDupeKeyError($errstr))
         {
             if ($self->{'_dbh'}->can('pg_rollback_to') && $self->{'_dbh'}->{private_dbdpg}{version} >= 80000)
             {
@@ -399,13 +393,19 @@ sub insert
             }
             return undef;
         }
+        warn(sprintf("Could not execute(%s)\n(%s)\n Error Code %d (%s)",
+                      $new_sql,
+                      join(',', @values),
+                      $errCode,
+                      $errstr));
         # TODO: Raise an exception.
         confess (sprintf("Could not execute(%s)\n(%s)\n Error Code %d (%s)",
                       $new_sql,
                       join(',', @values),
-                      $self->{'_dbh'}->err,
-                      $self->{'_dbh'}->errstr));
+                      $errCode,
+                      $errstr));
     };
+    }; confess($@) if ($@);
     if ($self->{'_dbh'}->can('pg_release') && $self->{'_dbh'}->{private_dbdpg}{version} >= 80000)
     {
         $self->{'_dbh'}->pg_release("pre_insert");
@@ -414,6 +414,7 @@ sub insert
     # WARNING: This assumes that the first primary key field is the one with the serial column.
     # In most cases it is, but this wont work if it isnt.
 
+    # TODO: Use $dbh->last_insert_id() instead of this.
     my $seqName = sprintf("%s_%s_seq", $self->{'_table'}->name(), ($self->{'_table'}->primaryKeys())[0]);
     my $lastIdSql = "SELECT CURRVAL(?)";
     my $lastIdSth = $self->{'_dbh'}->prepare_cached($lastIdSql, {pg_prepare_now => 1}, 3)
@@ -423,6 +424,8 @@ sub insert
     my $newId = $lastIdSth->fetchall_arrayref()->[0]->[0];
 
     $self->{($self->{'_table'}->primaryKeys())[0]} = $newId;
+    delete($self->{'_notInserted'});
+
     return $newId;
 }
 # /* insert */ }}}
@@ -469,7 +472,8 @@ sub update
     $update_sth->execute(@values) or
     do
     {
-        if ($self->_catchDupeKeyError())
+        my $errstr = $self->{'_dbh'}->errstr;
+        if ($self->_catchDupeKeyError($errstr))
         {
             if ($self->{'_dbh'}->can('pg_rollback_to') && $self->{'_dbh'}->{private_dbdpg}{version} >= 80000)
             {
@@ -478,11 +482,12 @@ sub update
             return undef;
         }
         # TODO: Raise an exception.
-        confess (sprintf("Could not execute(%s)\n(%s)\n Error Code %d (%s)",
+        warn (sprintf("Could not execute(%s)\n(%s)\n Error Code %d (%s)",
                           $update_sql,
                           join(', ', @values),
                           $self->{'_dbh'}->err,
-                          $self->{'_dbh'}->errstr));
+                          $errstr));
+        die "Update Failed";
     };
     if ($self->{'_dbh'}->can('pg_release') && $self->{'_dbh'}->{private_dbdpg}{version} >= 80000)
     {
@@ -541,7 +546,7 @@ sub delete
 sub _catchDupeKeyError
 {
     my $self = shift;
-    my $errorString = $self->{'_dbh'}->errstr;
+    my $errorString = shift; # $self->{'_dbh'}->errstr;
 
     my $tableName = $self->{'_table'}->name();
     # TODO: This error string is postresql specific. Perhaps I should create a DB::Table::Row::Pg module instead?
@@ -642,6 +647,26 @@ sub getValue
     {
         confess("You cannot read field $fieldName")
     }
+    # TODO: DBD::Pg does not support array types yet, so we cannot give/recieve array-refs
+    # to/from the DBI, only strings which represent the arrays, so we have to parse them.
+    if ($self->{'_table'}->field($fieldName)->{'is_array'})
+    {
+        # Its should be a scalar, of the form '{ el1, el2, elN }'
+        # Its a bit of a hack, but we can just change the '{' and '}'
+        # characters to '[' and ']' and then eval it to convert it to
+        # a perl array. It doesnt work on values with '{' or '}' tho.
+        return [] unless ($self->{$fieldName});
+        my $string = $self->{$fieldName};
+        $string =~ s/\{/\[/g;
+        $string =~ s/\}/\]/g;
+        my $val;
+        eval "\$val = $string;";
+        if ($@)
+        {
+            die "Could not convert $string to perl-array: $@";
+        }
+        return $val;
+    }
     return $self->{$fieldName};
 }
 # /* getValue */ }}} 
@@ -682,12 +707,50 @@ sub setValue
         confess("You cannot update field $fieldName")
     }
 
-    my $oldValue = $self->{$fieldName};
-    $self->{$fieldName} = $newValue;
+    my $oldValue = $self->$fieldName;
+    if ($self->{'_table'}->field($fieldName)->{'is_array'})
+    {
+        $self->{$fieldName} = $self->_arrayToString($newValue,
+                                                    $self->{'_table'}->field($fieldName)->{'type_num'},
+                                                    $self->{'_table'}->field($fieldName)->{'type'});
+    }
+    else
+    {
+        $self->{$fieldName} = $newValue;
+    }
     $self->{'_modified'} = 1;
     return $oldValue;
 }
 # /* setValue */ }}} 
+
+sub _arrayToString
+{
+    my $self     = shift;
+    my $arrayRef = shift;
+    my $type_num = shift;
+    my $type     = shift;
+
+    my @values;
+    foreach my $el (@{$arrayRef})
+    {
+        if (ref($el) eq 'ARRAY')
+        {
+            push @values, $self->_arrayToString($el, $type_num, $type);
+        }
+        else
+        {
+            if ($type =~ /(char|text|bytea)/)
+            {
+                push @values, $self->{'_dbh'}->quote($el, $type_num);
+            }
+            else
+            {
+                push @values, $el;
+            }
+        }
+    }
+    return '{' . join(',', @values) . '}';
+}
 
 # /* AUTOLOAD */ {{{
 # The accessor methods to this object are auto-loaded...
@@ -718,7 +781,7 @@ sub DESTROY
     # If we have been modified, write the changes back to the DB.
     my $self = shift;
 
-    if (exists ($self->{'_modified'}) && !exists($self->{'_deleted'}))
+    if (exists ($self->{'_modified'}) && !exists($self->{'_deleted'}) && !exists($self->{'_notInserted'}))
     {
         unless ($self->update())
         {
@@ -816,7 +879,7 @@ sub validate
 
         my $regex = $field->{'validate'}->{'regex'};
         eval {
-            unless ($self->$fieldName =~ /$regex/)
+            unless ($self->$fieldName =~ /$regex/gm)
             {
                 $self->{'_validation'}->{$fieldName} = $field->{'validate'}->{'error'} || "regular expression $regex failed";
                 $isValid = 0;
@@ -826,7 +889,7 @@ sub validate
         {
              confess("Failed to compile regular expression for $fieldName: $@");
         }
-        if (!$field->{'nullable'} && !$self->$fieldName)
+        if (!$field->{'nullable'} && !defined($self->$fieldName))
         {
             $self->{'_validation'}->{$fieldName} = $field->{'desc'} . " must not be empty";
             $isValid = 0;
@@ -847,6 +910,7 @@ sub validate
     foreach my $c (@constraints)
     {
         my $text = $c->{'constraint'};
+        $text =~ s/\"($fieldMap)\"/$1/g; # Strip quotes around fields, where appropriate.
         my @refs = ($text =~ /\b($fieldMap)\b/g);
         foreach my $ref (@refs)
         {

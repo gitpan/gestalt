@@ -12,14 +12,18 @@ WriteMakefile(NAME      => 'gestalt',
               EXE_FILES => ['bin/gestalt'],
               # Need copious amounts of escaping for this to work. It looks rubbish.
               PM_FILTER => 'sed -e "s/\\@PREFIX\\@/`echo "$(PERLPREFIX)" | sed -e "s/\//\\\\\\\\\\\\\\\\\//g"`/g"',
+              # Not sure what the min versions are. Will need to do testing on older versions
+              # to find this out.
+              PREREQ_PM => {'DBI'                    => 0,
+                            'Template'               => 0,
+                            'AppConfig'              => 0,
+                            'Template::Plugin::Page' => 0
+                           },
               DIR       => [
                  'DB',
-                 'DB/Table',
-                 'DB/Table/Row',
                  'Dispatcher',
-                 'Paginator',
                  'Controller' ],
-              VERSION   => '0.0.1');
+              VERSION   => '0.2.0');
 package MY;
 
 use vars qw($VERSION @ISA
@@ -66,6 +70,7 @@ sub postamble
 install ::
 	install -d -m 0755 $(PERLPREFIX)/share/gestalt
 	install -d -m 0755 $(PERLPREFIX)/share/gestalt/html/js
+	install -d -m 0755 $(PERLPREFIX)/share/gestalt/html/css
 	install -d -m 0755 $(PERLPREFIX)/share/gestalt/templates
 	for file in AUTHORS ChangeLog Controller.pm Makefile.PL Makefile.am \
 	NEWS README Row.pm Table.pm apache.conf.in appConfig.cfg.in appSpec.in \
@@ -78,8 +83,12 @@ install ::
 	do \
 		install -c -m 0644 templates/html/js/$$file $(PERLPREFIX)/share/gestalt/html/js ; \
 	done
+	for file in Makefile.am style.css; \
+	do \
+		install -c -m 0644 templates/html/css/$$file $(PERLPREFIX)/share/gestalt/html/css ; \
+	done
 	for file in _fieldDisplay.tt2 _fieldInput.tt2 _fkeyDisplay.tt2 _fkeyInput.tt2 \
-	_form.tt2 _header.tt2 _pager.tt2 create.tt2 edit.tt2 list.tt2 show.tt2 ; \
+	_form.tt2 _header.tt2 _pager.tt2 create.tt2 edit.tt2 list.tt2 show.tt2 _auth.tt2 ; \
 	do \
 		install -c -m 0644 templates/templates/$$file $(PERLPREFIX)/share/gestalt/templates ; \
 	done
@@ -116,16 +125,15 @@ pure_all :: @to
 	\$(NOECHO) \$(NOOP)
 
 realclean ::
-
-\$(INST_SCRIPT)/.exists :: /usr/lib/perl5/5.8.6/i386-linux-thread-multi/CORE/perl.h
+\$(INST_SCRIPT)/.exists :: \$(PERL_INC)/perl.h
 	\$(NOECHO) \$(MKPATH) \$(INST_SCRIPT)
-	\$(NOECHO) \$(EQUALIZE_TIMESTAMP) /usr/lib/perl5/5.8.6/i386-linux-thread-multi/CORE/perl.h \$(INST_SCRIPT)/.exists
+	\$(NOECHO) \$(EQUALIZE_TIMESTAMP) \$(PERL_INC)/perl.h \$(INST_SCRIPT)/.exists
 
 	-\$(NOECHO) \$(CHMOD) \$(PERM_RWX) \$(INST_SCRIPT)
 
-\$(INST_BIN)/.exists :: /usr/lib/perl5/5.8.6/i386-linux-thread-multi/CORE/perl.h
+\$(INST_BIN)/.exists :: \$(PERL_INC)/perl.h
 	\$(NOECHO) \$(MKPATH) \$(INST_BIN)
-	\$(NOECHO) \$(EQUALIZE_TIMESTAMP) /usr/lib/perl5/5.8.6/i386-linux-thread-multi/CORE/perl.h \$(INST_BIN)/.exists
+	\$(NOECHO) \$(EQUALIZE_TIMESTAMP) \$(PERL_INC)/perl.h \$(INST_BIN)/.exists
 
 	-\$(NOECHO) \$(CHMOD) \$(PERM_RWX) \$(INST_BIN)
 
