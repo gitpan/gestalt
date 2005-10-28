@@ -23,7 +23,7 @@ WriteMakefile(NAME      => 'gestalt',
                  'DB',
                  'Dispatcher',
                  'Controller' ],
-              VERSION   => '0.2.0');
+              VERSION   => '0.2.1');
 package MY;
 
 use vars qw($VERSION @ISA
@@ -68,30 +68,37 @@ sub postamble
 {
     '
 install ::
-	install -d -m 0755 $(PERLPREFIX)/share/gestalt
-	install -d -m 0755 $(PERLPREFIX)/share/gestalt/html/js
-	install -d -m 0755 $(PERLPREFIX)/share/gestalt/html/css
-	install -d -m 0755 $(PERLPREFIX)/share/gestalt/templates
+	install -d -m 0755 $(DESTDIR)$(PERLPREFIX)/share/gestalt
+	install -d -m 0755 $(DESTDIR)$(PERLPREFIX)/share/gestalt/html/js
+	install -d -m 0755 $(DESTDIR)$(PERLPREFIX)/share/gestalt/html/css
+	install -d -m 0755 $(DESTDIR)$(PERLPREFIX)/share/gestalt/templates
 	for file in AUTHORS ChangeLog Controller.pm Makefile.PL Makefile.am \
 	NEWS README Row.pm Table.pm apache.conf.in appConfig.cfg.in appSpec.in \
 	appStartup.pl.in bootstrap configure.in; \
 	do \
-		install -c -m 0644 templates/$$file $(PERLPREFIX)/share/gestalt/ ; \
+		install -c -m 0644 templates/$$file $(DESTDIR)$(PERLPREFIX)/share/gestalt/ ; \
 	done
-	install -c -m 0644 templates/html/Makefile.am $(PERLPREFIX)/share/gestalt/html
+	install -c -m 0644 templates/html/Makefile.am $(DESTDIR)$(PERLPREFIX)/share/gestalt/html
 	for file in Makefile.am prototype.js validate.js; \
 	do \
-		install -c -m 0644 templates/html/js/$$file $(PERLPREFIX)/share/gestalt/html/js ; \
+		install -c -m 0644 templates/html/js/$$file $(DESTDIR)$(PERLPREFIX)/share/gestalt/html/js ; \
 	done
 	for file in Makefile.am style.css; \
 	do \
-		install -c -m 0644 templates/html/css/$$file $(PERLPREFIX)/share/gestalt/html/css ; \
+		install -c -m 0644 templates/html/css/$$file $(DESTDIR)$(PERLPREFIX)/share/gestalt/html/css ; \
 	done
 	for file in _fieldDisplay.tt2 _fieldInput.tt2 _fkeyDisplay.tt2 _fkeyInput.tt2 \
 	_form.tt2 _header.tt2 _pager.tt2 create.tt2 edit.tt2 list.tt2 show.tt2 _auth.tt2 ; \
 	do \
-		install -c -m 0644 templates/templates/$$file $(PERLPREFIX)/share/gestalt/templates ; \
+		install -c -m 0644 templates/templates/$$file $(DESTDIR)$(PERLPREFIX)/share/gestalt/templates ; \
 	done
+
+    rpm: dist
+	cp $(NAME)-$(VERSION).tar.gz /usr/src/redhat/SOURCES/
+	rpmbuild -ba $(NAME).spec
+	cp /usr/src/redhat/SRPMS/$(NAME)-$(VERSION)-1.src.rpm .
+	cp /usr/src/redhat/RPMS/noarch/$(NAME)-$(VERSION)-1.noarch.rpm .
+
 ';
 }
 

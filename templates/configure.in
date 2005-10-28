@@ -5,6 +5,7 @@ AC_INIT([[% APP_NAME %]], [0.0.1], [[% EMAIL %]])
 AM_INIT_AUTOMAKE
 
 AC_PREFIX_DEFAULT([/data])
+exec_prefix=\${prefix}/\${app_name}
 
 app_name="[% APP_NAME %]"
 
@@ -39,6 +40,7 @@ AC_SUBST([VERSION])
 AC_SUBST([prefix])
 AC_SUBST([app_name])
 AC_SUBST([apacheIncludedConfigs])
+AC_SUBST([ac_configure_args])
 
 AC_CONFIG_FILES([Makefile \
                  DB/Makefile \
@@ -52,9 +54,13 @@ AC_CONFIG_FILES([Makefile \
                  html/css/Makefile \
                  templates/Makefile \
 [% FOREACH tableName = TABLES -%]
+                 Apache/Request/Controller/[% tableName %]/Makefile \
+[% END -%]
+[% FOREACH tableName = TABLES -%]
                  DB/Table/[% tableName %]/Makefile \
                  DB/Table/Row/[% tableName %]/Makefile \
-                 Apache/Request/Controller/[% tableName %]/Makefile \
+[% END -%]
+[% FOREACH tableName = TABLES -%]
                  templates/[% tableName %]/Makefile \
 [% END -%]
                  [% APP_NAME %].cfg \

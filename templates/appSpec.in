@@ -1,28 +1,31 @@
-[% DEFAULT APP_NAME='mySpiffyApp' -%]
-[% DEFAULT EMAIL='bradley@kitefamily.co.uk' -%]
-Summary: [% APP_NAME %] Apache Module
-Name: [% APP_NAME %]
+Summary: @PACKAGE_NAME@ Apache Module
+Name: @PACKAGE@
 Version: @VERSION@
 Release: 1
-Group: WWW
-License: GPL
+Group: Synetrix
+License: WWW
 BuildRoot: %{_tmppath}/%{name}-root
 BuildArch: noarch
-Source0: [% APP_NAME %]-@VERSION@.tar.gz
+Source0: @PACKAGE@-@VERSION@.tar.gz
+Requires: @PACKAGE@-db-modules = @VERSION@
 
 %description
 CHANGE ME
+
+%package db-modules
+Group: Databases
+Summary: Modules for accessing the @PACKAGE_NAME@ database
+
+%description db-modules
+Modules for accessing the @PACKAGE_NAME@ database.
 
 %prep
 %setup -q
 
 %build
 
-aclocal
-autoconf
-automake
-
-./configure --prefix=@prefix@
+./bootstrap
+./configure @ac_configure_args@
 
 make
 
@@ -36,25 +39,34 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(0644,root,root)
 [% FOREACH tableName = TABLES -%]
-@prefix@/modules/DB/Row/[% tableName %].pm
-@prefix@/modules/DB/Table/[% tableName %].pm
 @prefix@/modules/Apache/Request/Controller/[% tableName %].pm
-@prefix@/[% APP_NAME %]/templates/[% tableName %]/list.tt2
-@prefix@/[% APP_NAME %]/templates/[% tableName %]/show.tt2
-@prefix@/[% APP_NAME %]/templates/[% tableName %]/create.tt2
-@prefix@/[% APP_NAME %]/templates/[% tableName %]/edit.tt2
 [% END -%]
-@prefix@/[% APP_NAME %]/templates/_header.tt2
-@prefix@/[% APP_NAME %]/templates/_fieldDisplay.tt2
-@prefix@/[% APP_NAME %]/templates/_fieldInput.tt2
-@prefix@/[% APP_NAME %]/templates/_fkeyDisplay.tt2
-@prefix@/[% APP_NAME %]/templates/_fkeyInput.tt2
-@prefix@/[% APP_NAME %]/templates/_pager.tt2
-@prefix@/[% APP_NAME %]/templates/_form.tt2
-@prefix@/[% APP_NAME %]/templates/_auth.tt2
-@prefix@/[% APP_NAME %]/html/js/prototype.js
-@prefix@/[% APP_NAME %]/html/js/validate.js
-@prefix@/[% APP_NAME %]/html/css/style.css
-%config @apacheIncludedConfigs@/[% APP_NAME %].apache.conf
-%config @apacheIncludedConfigs@/[% APP_NAME %].pl
-%config @prefix@/[% APP_NAME %]/[% APP_NAME %].cfg
+[% FOREACH tableName = TABLES -%]
+@prefix@/@PACKAGE_NAME@/templates/[% tableName %]/list.tt2
+@prefix@/@PACKAGE_NAME@/templates/[% tableName %]/show.tt2
+@prefix@/@PACKAGE_NAME@/templates/[% tableName %]/create.tt2
+@prefix@/@PACKAGE_NAME@/templates/[% tableName %]/edit.tt2
+[% END -%]
+@prefix@/@PACKAGE_NAME@/templates/_header.tt2
+@prefix@/@PACKAGE_NAME@/templates/_fieldDisplay.tt2
+@prefix@/@PACKAGE_NAME@/templates/_fieldInput.tt2
+@prefix@/@PACKAGE_NAME@/templates/_fkeyDisplay.tt2
+@prefix@/@PACKAGE_NAME@/templates/_fkeyInput.tt2
+@prefix@/@PACKAGE_NAME@/templates/_pager.tt2
+@prefix@/@PACKAGE_NAME@/templates/_form.tt2
+@prefix@/@PACKAGE_NAME@/templates/_auth.tt2
+@prefix@/@PACKAGE_NAME@/html/js/prototype.js
+@prefix@/@PACKAGE_NAME@/html/js/validate.js
+@prefix@/@PACKAGE_NAME@/html/css/style.css
+%config @apacheIncludedConfigs@/@PACKAGE_NAME@.apache.conf
+%config @apacheIncludedConfigs@/@PACKAGE_NAME@.pl
+%config @prefix@/@PACKAGE_NAME@/@PACKAGE_NAME@.cfg
+
+%files db-modules
+[% FOREACH tableName = TABLES -%]
+@prefix@/modules/DB/Table/[% tableName %].pm
+[% END -%]
+[% FOREACH tableName = TABLES -%]
+@prefix@/modules/DB/Table/Row/[% tableName %].pm
+[% END %]
+

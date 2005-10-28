@@ -889,9 +889,9 @@ sub validate
         {
              confess("Failed to compile regular expression for $fieldName: $@");
         }
-        if (!$field->{'nullable'} && !defined($self->$fieldName))
+        if (($field->{'nullable'} == 0) && ($self->$fieldName eq ''))
         {
-            $self->{'_validation'}->{$fieldName} = $field->{'desc'} . " must not be empty";
+            $self->{'_validation'}->{$fieldName} = $field->{'desc'} . " must not be null";
             $isValid = 0;
         }
         if ($field->{'constraint'})

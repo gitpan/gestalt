@@ -1,6 +1,3 @@
-[% DEFAULT APP_NAME='mySpiffyApp' -%]
-[% DEFAULT EMAIL='bradley@kitefamily.co.uk' -%]
-
 [%- IF TOP_LEVEL -%]
 SUBDIRS = DB Apache templates html
 [% END -%]
@@ -21,7 +18,7 @@ SUBDIRS = Controller
 SUBDIRS = [% IF TABLE %]Row [% END %][% FOREACH tableName = TABLES %][% tableName %][% UNLESS loop.last %] [% END %][% END %]
 [% IF TEMPLATE -%]
 
-templatedir=$(prefix)/[% APP_NAME %]/templates
+templatedir=$(prefix)/$(PACKAGE_NAME)/templates
 template_DATA = _header.tt2 \
                 _fieldDisplay.tt2 \
                 _fieldInput.tt2 \
@@ -41,7 +38,7 @@ EXTRA_DIST = $(module_DATA)
 [% END -%]
 
 [%- IF (!BASE) && TEMPLATE -%]
-templatedir=$(prefix)/[% APP_NAME %]/templates/[% tableName %]
+templatedir=$(prefix)/$(PACKAGE_NAME)/templates/[% tableName %]
 template_DATA = list.tt2 \
                 show.tt2 \
                 create.tt2 \
@@ -51,18 +48,19 @@ EXTRA_DIST = $(template_DATA)
 
 [% IF TOP_LEVEL -%]
 
-cfgdir=$(prefix)/[% APP_NAME %]
-cfg_DATA = [% APP_NAME %].cfg
+cfgdir=$(prefix)/$(PACKAGE_NAME)
+cfg_DATA = $(PACKAGE_NAME).cfg
 
 apacheconfdir=$(apacheIncludedConfigs)
-apacheconf_DATA = [% APP_NAME %].apache.conf \
-                  [% APP_NAME %].pl
+apacheconf_DATA = $(PACKAGE_NAME).apache.conf \
+                  $(PACKAGE_NAME).pl
 
 EXTRA_DIST = $(cfg_DATA) $(apacheconf_DATA)
 
 rpm: dist
-	cp [% APP_NAME %]-$(VERSION).tar.gz /usr/src/redhat/SOURCES/
-	rpmbuild -ba [% APP_NAME %].spec
-	cp /usr/src/redhat/SRPMS/[% APP_NAME %]-$(VERSION)-1.src.rpm .
-	cp /usr/src/redhat/RPMS/noarch/[% APP_NAME %]-$(VERSION)-1.noarch.rpm .
+	cp $(PACKAGE)-$(VERSION).tar.gz /usr/src/redhat/SOURCES/
+	rpmbuild -ba $(PACKAGE_NAME).spec
+	cp /usr/src/redhat/SRPMS/$(PACKAGE)-$(VERSION)-1.src.rpm .
+	cp /usr/src/redhat/RPMS/noarch/$(PACKAGE)-$(VERSION)-1.noarch.rpm .
+	cp /usr/src/redhat/RPMS/noarch/$(PACKAGE)-db-modules-$(VERSION)-1.noarch.rpm .
 [% END -%]
